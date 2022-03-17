@@ -1,0 +1,79 @@
+version: '3.8'
+
+volumes:
+  mongo_vol:
+  postgre_vol:
+
+networks:
+  q6_network:
+    driver: bridge
+
+services:
+  movieapp:
+    image: prhirata/movieapp:q6
+    build: 
+      dockerfile: ./Dockerfile
+      context: ./movie/src
+    ports:
+      - 8181:8181
+    networks:
+      - q6_network
+    depends_on:
+      - mongodb
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+
+  mongodb:
+    image: mongo:4.4.3
+    ports:
+      - 27017:27017
+    networks:
+      - q6_network
+    volumes:
+      - mongo_vol:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PWD}
+
+  postgresql:
+    image: postgres:14.1
+    ports:
+      - 5432:5432
+    networks:
+      - q6_network
+    volumes:
+      - postgre_vol:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PWD}
+      POSTGRES_DB: ${POSTGRES_DB}
+  
+  reviewapp:
+    image: prhirata/reviewapp:q6
+    build: 
+      dockerfile: ./Dockerfile
+      context: ./review/src/Review.Web
+    ports:
+      - 8182:80
+    networks:
+      - q6_network
+    depends_on:
+      - postgresql
+    environment:
+      ConnectionStrings__MyConnection: ${POSTGRESQL_CONNECTION}
+
+  rottenapp:
+    image: prhirata/rottenapp:q6
+    build:
+      dockerfile: ./Dockerfile
+      context: ./rotten-potatoes-ms/src
+    ports:
+      - 5000:5000
+    networks:
+      - q6_network
+    depends_on:
+      - reviewapp
+      - movieapp
+    environment:
+      MOVIE_SERVICE_URI: http://movieapp:8181
+      REVIEW_SERVICE_URI: http://reviewapp:8182
